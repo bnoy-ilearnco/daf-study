@@ -2,7 +2,7 @@ name: Update shiurim
 
 on:
   schedule:
-    - cron: "17 22 * * *"   # once a day, 6:17 PM New York time (5:17 PM in winter)
+    - cron: "17 11,22 * * *"   # twice a day: 7:17 AM and 6:17 PM New York time (6:17 AM / 5:17 PM in winter)
   workflow_dispatch:
   push:
     branches: [main]

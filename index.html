@@ -1,0 +1,579 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Daf Study Player</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+[hidden]{display:none!important}
+/* Layout: a reader's desk. Daf grid on the left, the amud in the middle, the shiur on a bar along the bottom. */
+:root{
+  --bg:#ecebe6; --panel:#fafaf7; --ink:#1f2328; --muted:#646b73; --line:#d9d8d1;
+  --accent:#2f5d62; --accent-ink:#ffffff; --accent-soft:#dde8e7; --done:#3f7a4a; --chip:#eeede7; --paper:#ffffff;
+  --he:"Frank Ruhl Libre","Times New Roman",serif;
+  --ui:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){ --bg:#15181a; --panel:#1d2124; --ink:#e7e9ea; --muted:#9aa2a8; --line:#2f3539;
+    --accent:#7fb3b8; --accent-ink:#0f1416; --accent-soft:#22363a; --done:#86c08f; --chip:#262b2f; --paper:#f4f3ee; color-scheme:dark; }
+}
+:root[data-theme="dark"]{ --bg:#15181a; --panel:#1d2124; --ink:#e7e9ea; --muted:#9aa2a8; --line:#2f3539;
+  --accent:#7fb3b8; --accent-ink:#0f1416; --accent-soft:#22363a; --done:#86c08f; --chip:#262b2f; --paper:#f4f3ee; color-scheme:dark; }
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.4 var(--ui);overflow:hidden}
+button,select,a{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none;padding:0}
+button:focus-visible,a:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.he{font-family:var(--he);direction:rtl;unicode-bidi:isolate}
+.app{height:100%;display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:auto minmax(0,1fr);
+  grid-template-areas:"top top" "side main" "player player"}
+
+/* top bar */
+header{grid-area:top;display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+.iconbtn{width:40px;height:40px;border-radius:10px;border:1px solid var(--line);display:grid;place-items:center;background:var(--panel)}
+.iconbtn:hover{background:var(--chip)}
+.iconbtn:disabled{opacity:.35;cursor:default}
+.seg{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--panel)}
+.seg button{padding:8px 13px;min-height:40px;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button.on{background:var(--accent);color:var(--accent-ink)}
+.seg button:disabled{opacity:.35;cursor:default}
+.seg .he{font-size:17px}
+.dafnav{display:flex;align-items:center;gap:6px}
+.daflabel{min-width:130px;text-align:center;line-height:1.1}
+.daflabel .he{display:block;font-size:22px;font-weight:700}
+.daflabel small{color:var(--muted);font-size:12px;letter-spacing:.02em}
+.spacer{flex:1}
+.learn{padding:8px 13px;min-height:40px;border-radius:10px;border:1px solid var(--line);background:var(--panel)}
+.learn.on{background:var(--done);border-color:var(--done);color:#fff}
+
+/* sidebar */
+aside{grid-area:side;width:260px;background:var(--panel);border-right:1px solid var(--line);overflow:auto;padding:12px}
+.prog{font-size:12.5px;color:var(--muted);margin:2px 2px 10px}
+.bar{height:4px;background:var(--line);border-radius:2px;margin-top:6px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--done);width:0}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.cell{position:relative;padding:7px 0 6px;border-radius:8px;background:var(--chip);text-align:center;line-height:1.05;border:1px solid transparent}
+.cell:hover{border-color:var(--accent)}
+.cell .he{display:block;font-size:16px}
+.cell .n{font-size:10.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.cell.cur{background:var(--accent);color:var(--accent-ink)}
+.cell.cur .n{color:var(--accent-ink)}
+.cell.done::after{content:"✓";position:absolute;top:2px;right:5px;font-size:10px;color:var(--done)}
+.cell.cur.done::after{color:var(--accent-ink)}
+.cell .c13{position:absolute;top:5px;left:5px;width:5px;height:5px;border-radius:50%;background:var(--accent)}
+.cell.cur .c13{background:var(--accent-ink)}
+.legend{display:flex;gap:12px;font-size:11.5px;color:var(--muted);margin:12px 2px 0;flex-wrap:wrap}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i{width:6px;height:6px;border-radius:50%;background:var(--accent);display:inline-block}
+
+/* reader */
+main{grid-area:main;min-width:0;min-height:0;display:flex;flex-direction:column}
+.tools{display:flex;align-items:center;gap:8px;padding:8px 16px 0;color:var(--muted);font-size:12.5px}
+.tools .iconbtn{width:34px;height:34px;font-size:16px}
+.pages{flex:1;min-height:0;display:flex;gap:12px;padding:8px 16px 12px}
+.page{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.page .cap{display:flex;justify-content:space-between;align-items:baseline;padding:6px 12px;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--muted)}
+.page .cap .he{font-size:15px;color:var(--ink)}
+.scroll{flex:1;min-height:0;overflow:auto;background:var(--paper);-webkit-overflow-scrolling:touch}
+.scroll canvas{display:block;margin:0 auto}
+.msg{padding:28px 16px;text-align:center;color:#555}
+
+/* player */
+footer{grid-area:player;background:var(--panel);border-top:1px solid var(--line);padding:10px 16px calc(12px + env(safe-area-inset-bottom,0px));display:grid;gap:9px}
+.shiurim{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
+.shiurim .lbl{color:var(--muted);font-size:12.5px;margin-right:2px}
+.chip{padding:7px 12px;border-radius:999px;background:var(--chip);border:1px solid transparent;font-size:13px;min-height:36px;display:inline-flex;align-items:center;gap:6px}
+.chip:hover{border-color:var(--accent)}
+.chip.on{background:var(--accent-soft);border-color:var(--accent);color:var(--ink);font-weight:600}
+.chip .t{color:var(--muted);font-weight:400;font-variant-numeric:tabular-nums}
+.chip .note{color:var(--muted);font-weight:400;font-size:12px}
+.chip .pref{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);font-weight:600}
+.controls{display:flex;align-items:center;gap:10px}
+.play{width:46px;height:46px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;flex:none}
+.play svg{width:18px;height:18px;fill:currentColor}
+.skip{padding:8px 10px;border-radius:9px;font-size:12.5px;border:1px solid var(--line);font-variant-numeric:tabular-nums}
+.time{font-variant-numeric:tabular-nums;font-size:12.5px;color:var(--muted);min-width:46px;text-align:center}
+input[type=range]{flex:1;min-width:60px;accent-color:var(--accent)}
+select{padding:7px 6px;border-radius:9px;border:1px solid var(--line);background:var(--panel)}
+.out{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.openbtn{display:inline-flex;align-items:center;gap:10px;padding:10px 18px;border-radius:999px;background:var(--accent);color:var(--accent-ink);text-decoration:none;font-weight:600;min-height:46px}
+.openbtn svg{width:16px;height:16px;fill:currentColor}
+.hint{font-size:12.5px;color:var(--muted);max-width:60ch}
+.ext{font-size:12px;color:var(--muted);text-decoration:none;white-space:nowrap}
+.ext:hover{color:var(--accent)}
+
+@media (max-width:900px){
+  aside{position:fixed;z-index:5;left:0;top:0;bottom:0;box-shadow:0 8px 30px rgba(0,0,0,.25);padding-top:calc(12px + env(safe-area-inset-top,0px))}
+  .daflabel{min-width:96px}
+  .tools .keys{display:none}
+}
+@media (max-width:640px){
+  header{gap:8px}
+  .pages{flex-direction:column;overflow:auto}
+  .page{flex:none;min-height:70vh}
+  .time{min-width:38px}
+}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+
+
+<div class="app">
+<header>
+  <button class="iconbtn" id="toggleSide" aria-label="Show or hide the daf list" title="Daf list">☰</button>
+  <div class="seg" id="tracSeg" aria-label="Masechta"></div>
+  <div class="dafnav">
+    <button class="iconbtn" id="prev" aria-label="Previous daf" title="Previous daf ( [ )">‹</button>
+    <div class="daflabel" id="dafLabel"></div>
+    <button class="iconbtn" id="next" aria-label="Next daf" title="Next daf ( ] )">›</button>
+  </div>
+  <div class="seg" id="amudSeg" aria-label="Amud">
+    <button data-v="a"><span class="he">עמוד א</span></button>
+    <button data-v="b"><span class="he">עמוד ב</span></button>
+    <button data-v="both">Both</button>
+  </div>
+  <span class="spacer"></span>
+  <button class="learn" id="learnBtn" title="Mark this daf as learned">✓ Learned</button>
+</header>
+
+<aside id="side" hidden>
+  <div class="prog"><span id="progTxt"></span><div class="bar"><i id="progBar"></i></div></div>
+  <div class="grid" id="grid"></div>
+  <div class="legend"><span><i></i>Cycle 13 shiur</span><span>✓ learned</span></div>
+</aside>
+
+<main>
+  <div class="tools">
+    <button class="iconbtn" id="zoomOut" aria-label="Zoom out" title="Zoom out">−</button>
+    <button class="iconbtn" id="zoomIn" aria-label="Zoom in" title="Zoom in">+</button>
+    <button class="skip" id="zoomFit" title="Fit to width">Fit width</button>
+    <span id="zoomTxt"></span>
+    <span class="spacer"></span>
+    <span class="keys">Keys: Space play · ← → skip · [ ] daf · A / B amud</span>
+  </div>
+  <div class="pages" id="pages"></div>
+</main>
+
+<footer>
+  <div class="shiurim" id="shiurim"></div>
+  <div class="controls" id="inline">
+    <button class="play" id="play" aria-label="Play or pause"><svg id="playIcon" viewBox="0 0 24 24"><path d="M7 4l14 8-14 8z"/></svg></button>
+    <button class="skip" id="back" title="Back 15 seconds">−15</button>
+    <button class="skip" id="fwd" title="Forward 30 seconds">+30</button>
+    <span class="time" id="cur">0:00</span>
+    <input type="range" id="seek" min="0" max="1000" value="0" aria-label="Position in shiur">
+    <span class="time" id="dur">0:00</span>
+    <select id="rate" aria-label="Playback speed"><option>0.75</option><option selected>1</option><option>1.1</option><option>1.25</option><option>1.5</option><option>1.75</option><option>2</option></select>
+    <a class="ext" id="ext1" target="_blank" rel="noopener">Open MP3 ↗</a>
+  </div>
+  <div class="out" id="outside" hidden>
+    <a class="openbtn" id="openBtn" target="_blank" rel="noopener"><svg viewBox="0 0 24 24"><path d="M7 4l14 8-14 8z"/></svg><span id="openTxt">Play shiur</span></a>
+    <span class="hint">This shiur didn't load in the page. Open it in a new tab instead, or check your connection and reload.</span>
+  </div>
+</footer>
+</div>
+<audio id="audio" preload="metadata"></audio>
+
+<script src="pdf.min.js"></script>
+<script>
+/* ===== Data from shasilluminated.org, Rabbi Moshe Brown (speaker 27) ===== */
+const CDN = "https://d3mlxbc2l017o2.cloudfront.net/";
+const YEV = (function(){
+const DY22 = [
+[2,"1:09:06","9 Mar 2022","final/Yevamos-2_rabbi-moshe-brown_Mar-18-22.mp3"],
+[3,"1:03:08","10 Mar 2022","final/Yevamos-3_rabbi-moshe-brown_Mar-18-22.mp3"],
+[4,"1:10:11","11 Mar 2022","final/Yevamos-4_rabbi-moshe-brown_Mar-18-22.mp3"],
+[6,"53:32","13 Mar 2022","final/Yevamos-6_rabbi-moshe-brown_Mar-18-22.mp3"],
+[7,"1:01:03","14 Mar 2022","final/Yevamos-7_rabbi-moshe-brown_Mar-18-22.mp3"],
+[8,"1:07:15","15 Mar 2022","final/Yevamos-8_rabbi-moshe-brown_Mar-18-22.mp3"],
+[9,"58:51","16 Mar 2022","final/Yevamos-9_rabbi-moshe-brown_Mar-16-22.mp3"],
+[10,"1:00:39","17 Mar 2022","final/Yevamos-10_rabbi-moshe-brown_Mar-18-22.mp3"],
+[11,"1:07:50","18 Mar 2022","final/Yevamos-11_rabbi-moshe-brown_Mar-18-22.mp3"],
+[13,"53:36","20 Mar 2022","final/Yevamos-13_rabbi-moshe-brown_Mar-20-22.mp3"],
+[14,"56:26","21 Mar 2022","final/Yevamos-14_rabbi-moshe-brown_Mar-21-22.mp3"],
+[15,"1:02:44","22 Mar 2022","final/Yevamos-15_rabbi-moshe-brown_Mar-23-22.mp3"],
+[16,"1:04:11","23 Mar 2022","final/Yevamos-16_rabbi-moshe-brown_Mar-23-22.mp3"],
+[17,"58:14","24 Mar 2022","final/Yevamos-17_rabbi-moshe-brown_Mar-29-22.mp3"],
+[18,"1:03:10","25 Mar 2022","final/Yevamos-18_rabbi-moshe-brown_Mar-29-22.mp3"],
+[20,"1:00:39","27 Mar 2022","final/Yevamos-20_rabbi-moshe-brown_Mar-29-22.mp3"],
+[21,"1:02:35","28 Mar 2022","final/Yevamos-21_rabbi-moshe-brown_Mar-29-22.mp3"],
+[22,"1:02:04","29 Mar 2022","final/Yevamos-22_rabbi-moshe-brown_Mar-29-22.mp3"],
+[23,"1:03:09","30 Mar 2022","final/Yevamos-23_rabbi-moshe-brown_Mar-31-22.mp3"],
+[24,"1:01:45","31 Mar 2022","final/Yevamos-24_rabbi-moshe-brown_Apr-01-22.mp3"],
+[25,"1:01:01","1 Apr 2022","final/Yevamos-25_rabbi-moshe-brown_Apr-01-22.mp3"],
+[27,"56:01","3 Apr 2022","final/Yevamos-27_rabbi-moshe-brown_Apr-04-22.mp3"],
+[28,"57:17","4 Apr 2022","final/Yevamos-28_rabbi-moshe-brown_Apr-04-22.mp3"],
+[29,"1:03:53","5 Apr 2022","final/Yevamos-29_rabbi-moshe-brown_Apr-05-22.mp3"],
+[30,"1:05:49","6 Apr 2022","final/Yevamos-30_rabbi-moshe-brown_Apr-11-22.mp3"],
+[31,"1:01:49","7 Apr 2022","final/Yevamos-31_rabbi-moshe-brown_Apr-11-22.mp3"],
+[32,"1:08:10","8 Apr 2022","final/Yevamos-32_rabbi-moshe-brown_Apr-11-22.mp3"],
+[34,"1:01:13","10 Apr 2022","final/Yevamos-34_rabbi-moshe-brown_Apr-11-22.mp3"],
+[35,"1:03:14","11 Apr 2022","final/Yevamos-35_rabbi-moshe-brown_Apr-11-22.mp3"],
+[36,"1:04:30","12 Apr 2022","final/Yevamos-36_rabbi-moshe-brown_Apr-13-22.mp3"],
+[37,"1:07:36","13 Apr 2022","final/Yevamos-37_rabbi-moshe-brown_Apr-13-22.mp3"],
+[38,"1:02:43","14 Apr 2022","final/Yevamos-38_rabbi-moshe-brown_Apr-20-22.mp3"],
+[39,"1:08:20","15 Apr 2022","final/Yevamos-39_rabbi-moshe-brown_Apr-20-22.mp3"],
+[42,"47:55","18 Apr 2022","final/Yevamos-42_rabbi-moshe-brown_Apr-20-22.mp3"],
+[43,"59:16","19 Apr 2022","final/Yevamos-43_rabbi-moshe-brown_Apr-20-22.mp3"],
+[44,"49:52","20 Apr 2022","final/Yevamos-44_rabbi-moshe-brown_Apr-20-22.mp3"],
+[45,"51:42","21 Apr 2022","final/Yevamos-45_rabbi-moshe-brown_Apr-26-22.mp3"],
+[48,"1:02:27","24 Apr 2022","final/Yevamos-48_rabbi-moshe-brown_Apr-26-22.mp3"],
+[49,"59:29","25 Apr 2022","final/Yevamos-49_rabbi-moshe-brown_Apr-26-22.mp3"],
+[50,"1:04:32","26 Apr 2022","final/Yevamos-50_rabbi-moshe-brown_Apr-26-22.mp3"],
+[51,"1:03:49","27 Apr 2022","final/Yevamos-51_rabbi-moshe-brown_Apr-27-22.mp3"],
+[52,"1:03:44","28 Apr 2022","final/Yevamos-52_rabbi-moshe-brown_May-01-22.mp3"],
+[53,"1:03:42","29 Apr 2022","final/Yevamos-53_rabbi-moshe-brown_May-01-22.mp3"],
+[55,"53:04","1 May 2022","final/Yevamos-55_rabbi-moshe-brown_May-03-22.mp3"],
+[56,"59:11","2 May 2022","final/Yevamos-56_rabbi-moshe-brown_May-06-22.mp3"],
+[57,"1:05:26","3 May 2022","final/Yevamos-57_rabbi-moshe-brown_May-03-22.mp3"],
+[58,"1:03:49","4 May 2022","final/Yevamos-58_rabbi-moshe-brown_May-06-22.mp3"],
+[59,"1:01:51","5 May 2022","final/Yevamos-59_rabbi-moshe-brown_May-06-22.mp3"],
+[60,"1:08:16","6 May 2022","final/Yevamos-60_rabbi-moshe-brown_May-06-22.mp3"],
+[62,"52:30","8 May 2022","final/Yevamos-62_rabbi-moshe-brown_May-08-22.mp3"],
+[63,"1:02:21","9 May 2022","final/Yevamos-63_rabbi-moshe-brown_May-10-22.mp3"],
+[64,"1:07:27","10 May 2022","final/Yevamos-64_rabbi-moshe-brown_May-10-22.mp3"],
+[65,"1:06:38","11 May 2022","final/Yevamos-65_rabbi-moshe-brown_May-11-22.mp3"],
+[66,"1:01:14","12 May 2022","final/Yevamos-66_rabbi-moshe-brown_May-13-22.mp3"],
+[67,"1:07:36","13 May 2022","final/Yevamos-67_rabbi-moshe-brown_May-13-22.mp3"],
+[69,"50:51","15 May 2022","final/Yevamos-69_rabbi-moshe-brown_May-17-22.mp3"],
+[70,"1:01:19","16 May 2022","final/Yevamos-70_rabbi-moshe-brown_May-17-22.mp3"],
+[71,"1:03:55","17 May 2022","shas-media/final/41fbea67-9112-4425-a974-9978e883501f/audio/Yevamos-71_rabbi-moshe-brown_May-19-22.mp3"],
+[72,"1:01:30","18 May 2022","shas-media/final/9b8b547c-9d0a-49e9-8717-9134d2acf62a/audio/Yevamos-72_rabbi-moshe-brown_May-19-22.mp3"],
+[73,"59:45","19 May 2022","shas-media/final/1cde9fa5-b91f-4a5a-aa77-e6e4b4f09b69/audio/Yevamos-73_rabbi-moshe-brown_May-20-22.mp3"],
+[74,"1:04:54","20 May 2022","shas-media/final/332314ee-01a6-4a73-9b65-fedb1889a02d/audio/Yevamos-74_rabbi-moshe-brown_May-20-22.mp3"],
+[76,"52:31","22 May 2022","final/Yevamos-76_rabbi-moshe-brown_May-24-22.mp3"],
+[77,"58:59","23 May 2022","final/Yevamos-77_rabbi-moshe-brown_May-24-22.mp3"],
+[78,"1:06:02","24 May 2022","final/Yevamos-78_rabbi-moshe-brown_May-24-22.mp3"],
+[79,"1:02:59","25 May 2022","final/Yevamos-79_rabbi-moshe-brown_May-25-22.mp3"],
+[80,"1:01:57","26 May 2022","final/Yevamos-80_rabbi-moshe-brown_May-26-22.mp3"],
+[81,"1:01:20","27 May 2022","final/Yevamos-81_rabbi-moshe-brown_Jun-01-22.mp3"],
+[83,"55:22","29 May 2022","final/Yevamos-83_rabbi-moshe-brown_Jun-01-22.mp3"],
+[84,"43:40","30 May 2022","final/Yevamos-84_rabbi-moshe-brown_Jun-01-22.mp3"],
+[85,"50:59","31 May 2022","final/Yevamos-85_rabbi-moshe-brown_Jun-01-22.mp3"],
+[86,"50:10","1 Jun 2022","final/Yevamos-86_rabbi-moshe-brown_Jun-01-22.mp3"],
+[87,"1:04:33","2 Jun 2022","final/Yevamos-87rabbi-moshe-brownJun-08-22.mp3"],
+[88,"1:08:20","3 Jun 2022","final/Yevamos-88rabbi-moshe-brownJun-08-22.mp3"],
+[92,"1:07:47","7 Jun 2022","final/Yevamos-92rabbi-moshe-brownJun-08-22.mp3"],
+[93,"1:09:24","8 Jun 2022","final/Yevamos-93rabbi-moshe-brownJun-08-22.mp3"],
+[94,"1:00:43","9 Jun 2022","final/Yevamos-94rabbi-moshe-brownJun-10-22.mp3"],
+[95,"1:01:33","10 Jun 2022","final/Yevamos-95rabbi-moshe-brownJun-10-22.mp3"],
+[97,"53:24","12 Jun 2022","final/Yevamos-97rabbi-moshe-brownJun-19-22.mp3"],
+[98,"58:50","13 Jun 2022","final/Yevamos-98rabbi-moshe-brownJun-19-22.mp3"],
+[99,"1:07:55","14 Jun 2022","final/Yevamos-99rabbi-moshe-brownJun-19-22.mp3"],
+[100,"1:07:52","15 Jun 2022","final/Yevamos-100rabbi-moshe-brownJun-19-22.mp3"],
+[101,"1:00:21","16 Jun 2022","final/Yevamos-101rabbi-moshe-brownJun-19-22.mp3"],
+[102,"1:05:19","17 Jun 2022","final/Yevamos-102rabbi-moshe-brownJun-19-22.mp3"],
+[104,"50:41","19 Jun 2022","final/Yevamos-104rabbi-moshe-brownJun-22-22.mp3"],
+[105,"1:02:24","20 Jun 2022","final/Yevamos-105rabbi-moshe-brownJun-22-22.mp3"],
+[106,"1:08:14","21 Jun 2022","final/Yevamos-106rabbi-moshe-brownJun-22-22.mp3"],
+[107,"1:06:04","22 Jun 2022","final/Yevamos-107rabbi-moshe-brownJun-22-22.mp3"],
+[108,"1:01:30","23 Jun 2022","final/Yevamos-108rabbi-moshe-brownJun-24-22.mp3"],
+[109,"1:05:38","24 Jun 2022","final/Yevamos-109rabbi-moshe-brownJun-24-22.mp3"],
+[111,"52:06","26 Jun 2022","final/Yevamos-111rabbi-moshe-brownJun-27-22.mp3"],
+[112,"58:34","27 Jun 2022","final/Yevamos-112rabbi-moshe-brownJun-27-22.mp3"],
+[113,"1:02:27","28 Jun 2022","final/Yevamos-113rabbi-moshe-brownJul-01-22.mp3"],
+[114,"56:13","29 Jun 2022","final/Yevamos-114rabbi-moshe-brownJul-01-22.mp3"],
+[115,"52:31","30 Jun 2022","final/Yevamos-115rabbi-moshe-brownJul-01-22.mp3"],
+[116,"1:06:43","1 Jul 2022","final/Yevamos-116rabbi-moshe-brownJul-05-22.mp3"],
+[118,"59:19","3 Jul 2022","final/Yevamos-118rabbi-moshe-brownJul-05-22.mp3"],
+[119,"45:46","4 Jul 2022","final/Yevamos-119rabbi-moshe-brownJul-05-22.mp3"],
+[120,"1:07:22","5 Jul 2022","final/Yevamos-120rabbi-moshe-brownJul-05-22.mp3"],
+[121,"1:08:23","6 Jul 2022","Yevamos-121rabbi-moshe-brownJul-14-22.mp3"],
+[122,"1:01:10","7 Jul 2022","Yevamos-122rabbi-moshe-brownJul-14-22.mp3"]
+];
+// "cycle 13" series: daf:length  (file: final/YevamosNN-cycle-13_rabbi-moshe-brown_Nov-14-21.mp3)
+const C13 = "2:51:21,3:58:30,4:1:01:09,8:54:44,9:56:06,10:57:28,11:1:02:56,15:59:25,16:52:45,17:58:46,18:57:40,19:51:25,20:55:40,22:57:33,23:51:19,24:59:24,25:56:59,26:52:55,27:56:06,29:1:00:55,30:53:38,31:57:59,32:51:28,33:50:00,34:56:18,36:58:01,37:52:42,38:57:33,39:57:32,40:49:44,41:1:08:49,43:57:45,44:51:33,45:54:33,46:56:15,47:53:38,48:59:03,50:42:03,51:46:12,52:59:11,53:56:55,54:54:37,55:56:32,57:56:27,58:49:24,59:51:32,60:51:00,61:52:22,62:58:21,64:53:29,65:51:52,66:57:30,67:55:32,68:51:26,69:08:38,71:56:57,72:55:29,73:48:36,74:40:29,75:50:38,76:52:46,78:1:00:20,79:54:07,80:59:27,81:49:50,82:50:05,83:55:13,85:54:29,86:52:40,87:58:51,88:1:01:03,89:52:06,90:59:15,92:1:02:21,93:52:26,94:54:51,95:57:31,96:59:01,97:56:57,99:58:35,100:54:01,101:52:57,102:1:00:15,103:51:22,104:56:05,106:55:48,107:52:34,108:54:23,109:49:52,110:51:17,111:1:00:03,113:59:38,114:51:23,115:53:38,116:51:56,117:50:36,118:57:38,120:57:01,121:49:20,122:54:13";
+// earlier series: daf:length  (file: final/YEVAMOSN_rabbi-moshe-brown_Nov-08-21.mp3)
+const OLD = "3:1:00:00,4:51:06,5:56:34,6:54:23,7:48:16,8:53:04,10:52:31,11:50:03,12:55:09,13:56:27,14:47:08,15:44:43,17:54:57,18:50:31,19:52:05,22:42:54,24:1:04:15,25:48:30,26:50:01,27:50:38,28:48:28,29:53:08,31:58:47,32:48:37,33:50:36,34:50:12,35:50:44,36:52:06,38:1:01:28,39:51:18,40:56:35,41:50:25,42:45:13,43:51:15,45:50:32,46:49:28,47:51:23,48:48:56,49:45:51,50:45:57,52:58:56,53:47:18,54:47:19,55:47:42,56:45:45,57:43:02,59:37:24,60:45:47,61:39:35,62:55:24,63:40:32,64:49:36,66:50:12,67:58:28,68:47:17,69:45:21,70:48:22,71:50:05,73:46:06,74:40:38,75:48:25,76:46:34,77:44:55,78:48:40,80:46:21,81:41:46,82:33:08,83:48:59,84:44:12,85:47:58,87:54:49,88:45:09,89:54:17,90:52:59,91:51:41,92:51:38,93:40:29,95:48:06,96:50:08,97:48:24,98:45:44,99:44:33,101:40:02,102:46:20,103:46:13,104:44:10,105:44:06,106:43:46,108:48:35,109:43:05,110:54:10,111:55:07,112:51:43,113:50:07,115:54:02,116:48:55,117:53:50,119:51:11,120:49:28";
+return {DY22, C13, OLD};
+})();
+const BECH = {
+C13: "2:1:10:27,5:42:37,6:44:54,7:51:20,8:53:46,11:58:35,12:1:04:03,13:1:15:20,14:1:10:04,15:1:08:25,16:1:14:00,18:50:19,19:1:00:22,20:1:09:43,21:1:07:09,22:1:04:46,23:1:08:52,25:1:15:13,26:1:04:17,27:1:07:59,28:1:08:51,29:1:03:25,30:1:08:31,32:1:01:23,33:1:05:34,34:1:01:49,35:1:09:22,36:1:06:18,37:1:09:40,39:57:28,40:1:02:16,41:1:07:18,42:1:08:58,43:1:03:07,44:1:07:06,46:1:00:57,47:1:05:59,48:58:19,49:1:03:56,50:1:04:41,51:1:07:52,55:1:05:30,56:1:05:32,57:1:03:50,58:1:08:13,60:54:38,61:1:07:13",
+OLD: "2:55:13,3:54:24,4:58:21,6:57:56,7:52:29,8:1:00:14,9:56:33,10:51:25,11:54:27,13:52:22,14:50:33,16:51:14,17:49:40,18:55:23,20:59:50,21:48:22,22:54:48,23:56:21,24:46:51,25:55:09,27:54:04,28:49:42,29:58:21,30:57:39,31:46:57,32:53:51,34:13:07,35:52:37,36:59:46,37:48:47,38:50:16,39:51:05,41:52:59,42:55:07,43:51:06,44:46:58,45:52:30,46:49:33,48:1:00:10,49:58:26,50:52:44,51:50:11,52:49:47,53:52:59,55:55:09,58:51:36,59:54:12,60:55:08",
+DY26: [["2", "1:01:33", "20 Sep 2026", "final/Bechoros-2-rabbi-moshe-brown_1789920085.mp3"], ["3", "1:12:03", "21 Sep 2026", "final/Bechoros-3-rabbi-moshe-brown_1790050902.mp3"], ["4", "1:04:56", "22 Sep 2026", "final/Bechoros-4-rabbi-moshe-brown_1790225418.mp3"], ["5", "1:04:00", "23 Sep 2026", "final/Bechoros-5-rabbi-moshe-brown_1790225460.mp3"], ["6", "59:32", "24 Sep 2026", "final/Bechoros-6-rabbi-moshe-brown_1790255206.mp3"], ["7", "57:17", "25 Sep 2026", "final/Bechoros-7-rabbi-moshe-brown_1790374316.mp3"], ["10(9b)", "1:01:50", "28 Sep 2026", "final/Bechoros-109b-rabbi-moshe-brown_1790632138.mp3"], ["11(10b)", "1:06:55", "29 Sep 2026", "final/Bechoros-1110b-rabbi-moshe-brown_1790705523.mp3"], ["12(11b)", "59:24", "30 Sep 2026", "final/Bechoros-1211b-rabbi-moshe-brown_1790792128.mp3"], ["13(12)", "1:03:24", "1 Oct 2026", "final/Bechoros-1312-rabbi-moshe-brown_1790876369.mp3"], ["14(13-14a)", "58:27", "2 Oct 2026", "final/Bechoros-1413-14a-rabbi-moshe-brown_1790976630.mp3"], ["17", "57:08", "5 Oct 2026", "final/Bechoros-17-rabbi-moshe-brown_1791210282.mp3"], ["18(17)", "1:03:06", "6 Oct 2026", "final/Bechoros-1817-rabbi-moshe-brown_1791309240.mp3"], ["19", "54:28", "7 Oct 2026", "final/Bechoros-19-rabbi-moshe-brown_1791383884.mp3"], ["20", "1:01:21", "8 Oct 2026", "final/Bechoros-20-rabbi-moshe-brown_1791556835.mp3"], ["21", "1:06:47", "9 Oct 2026", "final/Bechoros-21-rabbi-moshe-brown_1791556950.mp3"], ["23", "53:01", "11 Oct 2026", "final/Bechoros-23-rabbi-moshe-brown_1791734132.mp3"]]
+};
+
+const SERIES = { c13:"Cycle 13", dy22:"Daf Yomi 2022", dy26:"Daf Yomi 2026", old:"Earlier series", extra:"Extra (2015)" };
+const ORDER = { c13:0, dy22:1, dy26:1, old:2, extra:3 };
+const parseCompact = s => s.split(",").map(x=>{const i=x.indexOf(":");return [+x.slice(0,i), x.slice(i+1)]});
+
+function buildTractate(o){
+  const by={}; for(let d=o.first; d<=o.last; d++) by[d]=[];
+  o.add(by);
+  for(const d in by) by[d].sort((a,b)=>ORDER[a.series]-ORDER[b.series] || (a.part||1)-(b.part||1));
+  return Object.assign(o,{byDaf:by});
+}
+const TR = {
+  y: buildTractate({key:"y", en:"Yevamos", he:"יבמות", first:2, last:122, lastB:true, add(by){
+    parseCompact(YEV.C13).forEach(([d,len])=>by[d].push({series:"c13", len, url:CDN+"final/Yevamos"+(d<10?"0"+d:d)+"-cycle-13_rabbi-moshe-brown_Nov-14-21.mp3"}));
+    YEV.DY22.forEach(([d,len,date,p])=>by[d].push({series:"dy22", len, date, url:CDN+p}));
+    parseCompact(YEV.OLD).forEach(([d,len])=>by[d].push({series:"old", len, url:CDN+"final/YEVAMOS"+d+"_rabbi-moshe-brown_Nov-08-21.mp3"}));
+    by[93].push({series:"extra", len:"1:10:05", date:"5 Jan 2015", url:CDN+"Yevamos-93rabbi-moshe-brownDec-30-22.mp3"});
+  }}),
+  b: buildTractate({key:"b", en:"Bechoros", he:"בכורות", first:2, last:61, lastB:false, add(by){
+    parseCompact(BECH.C13).forEach(([d,len])=>by[d].push({series:"c13", part:1, len, url:CDN+"final/bechoros"+d+"---cycle-13_rabbi-moshe-brown_Nov-17-21.mp3"}));
+    by[7].push({series:"c13", part:2, len:"48:06", url:CDN+"final/bechoros7-part-2---cycle-13_rabbi-moshe-brown_Nov-17-21.mp3"});
+    BECH.DY26.forEach(([title,len,date,p])=>{
+      const m=title.match(/^(\d+)(?:\(([^)]+)\))?$/);
+      let dapim=[+m[1]], note=null;
+      if(m[2]){ const r=m[2].match(/^(\d+)[ab]?(?:-(\d+)[ab]?)?$/); dapim=[+r[1]]; if(r[2]) for(let k=+r[1]+1;k<=+r[2];k++) dapim.push(k); note="covers "+m[2]; }
+      dapim.forEach(d=>by[d] && by[d].push({series:"dy26", len, date, note, url:CDN+p}));
+    });
+    parseCompact(BECH.OLD).forEach(([d,len])=>by[d].push({series:"old", len, url:CDN+"final/Bechoros"+d+"_rabbi-moshe-brown_Nov-08-21.mp3"}));
+  }})
+};
+
+/* ===== Hebrew numerals ===== */
+function heb(n){
+  const H=[[400,"ת"],[300,"ש"],[200,"ר"],[100,"ק"],[90,"צ"],[80,"פ"],[70,"ע"],[60,"ס"],[50,"נ"],[40,"מ"],[30,"ל"],[20,"כ"],[10,"י"],[9,"ט"],[8,"ח"],[7,"ז"],[6,"ו"],[5,"ה"],[4,"ד"],[3,"ג"],[2,"ב"],[1,"א"]];
+  let s="", r=n%100, h=n-r;
+  for(const [v,c] of H) while(h>=v){s+=c;h-=v;}
+  if(r===15) return s+"טו"; if(r===16) return s+"טז";
+  for(const [v,c] of H) while(r>=v){s+=c;r-=v;}
+  return s;
+}
+const pdfPath = (t,d,a) => `${t}/${String(d).padStart(3,"0")}${a}.pdf`;
+
+/* ===== Per-viewer storage ===== */
+const store = {
+  get(k,def){ try{ const v=localStorage.getItem("dsp:"+k); return v==null?def:JSON.parse(v);}catch(e){return def} },
+  set(k,v){ try{ localStorage.setItem("dsp:"+k, JSON.stringify(v)); }catch(e){} }
+};
+const S = {
+  t: store.get("t","y"),
+  daf: store.get("daf",{y:2,b:2}),
+  amud: store.get("amud","a"),
+  side: store.get("side", innerWidth>900),
+  done: store.get("done",{}),
+  pos: store.get("pos",{}),
+  heard: store.get("heard",{}),
+  rate: store.get("rate",1),
+  zoom: store.get("zoom",1)
+};
+const T = () => TR[S.t];
+const curDaf = () => S.daf[S.t];
+const $ = id => document.getElementById(id);
+const audio = $("audio");
+let current = null;
+let audioOK = null;   // null unknown, true plays inline, false blocked -> open in new tab
+
+/* ===== PDF rendering ===== */
+const pdfReady = !!window.pdfjsLib;
+if(pdfReady) pdfjsLib.GlobalWorkerOptions.workerSrc = "pdf.worker.min.js";
+const docs = new Map();
+function getDoc(url){
+  if(!docs.has(url)){
+    const p = pdfjsLib.getDocument({url, isEvalSupported:false, disableFontFace:true}).promise;
+    p.catch(()=>docs.delete(url));
+    docs.set(url,p);
+  }
+  return docs.get(url);
+}
+let renderGen = 0;
+async function renderCanvas(box, url, gen){
+  const msg = t => { box.innerHTML = `<div class="msg">${t}</div>`; };
+  if(!pdfReady){ msg("The page viewer did not load. Check your connection and reload."); return; }
+  try{
+    const doc = await getDoc(url); if(gen!==renderGen) return;
+    const page = await doc.getPage(1); if(gen!==renderGen) return;
+    const base = page.getViewport({scale:1});
+    const avail = Math.max(200, box.clientWidth - 2);
+    const cssScale = avail/base.width*S.zoom;
+    const dpr = Math.min(window.devicePixelRatio||1, 3);
+    const vp = page.getViewport({scale: cssScale*dpr});
+    const c = document.createElement("canvas");
+    c.width = Math.floor(vp.width); c.height = Math.floor(vp.height);
+    c.style.width = Math.floor(vp.width/dpr)+"px"; c.style.height = Math.floor(vp.height/dpr)+"px";
+    await page.render({canvasContext:c.getContext("2d"), viewport:vp}).promise;
+    if(gen!==renderGen) return;
+    box.replaceChildren(c);
+  }catch(e){ if(gen===renderGen) msg("This amud could not be loaded."); }
+}
+function renderPages(){
+  const t=T(), d=curDaf(), wrap=$("pages");
+  const hasB = d<t.last || t.lastB;
+  let amud = S.amud; if(amud!=="a" && !hasB) amud="a";
+  const list = amud==="both" ? ["a","b"] : [amud];
+  const gen = ++renderGen;
+  wrap.replaceChildren();
+  for(const a of list){
+    const p=document.createElement("section"); p.className="page";
+    p.innerHTML=`<div class="cap"><span class="he">${t.he} ${heb(d)}${a==="a"?".":":"}</span><span>${t.en} ${d}${a}</span></div><div class="scroll"><div class="msg">Loading…</div></div>`;
+    wrap.appendChild(p);
+    renderCanvas(p.querySelector(".scroll"), pdfPath(t.key,d,a), gen);
+  }
+  document.querySelectorAll("#amudSeg button").forEach(b=>{
+    b.classList.toggle("on", b.dataset.v===amud);
+    b.disabled = !hasB && b.dataset.v!=="a";
+  });
+  $("zoomTxt").textContent = Math.round(S.zoom*100)+"%";
+  // warm the next daf
+  if(pdfReady && d<t.last) setTimeout(()=>{ if(gen===renderGen){ getDoc(pdfPath(t.key,d+1,"a")); } }, 1500);
+}
+let rz; addEventListener("resize",()=>{ clearTimeout(rz); rz=setTimeout(renderPages,250); });
+function setZoom(z){ S.zoom=Math.max(.6,Math.min(3,Math.round(z*10)/10)); store.set("zoom",S.zoom); renderPages(); }
+$("zoomIn").onclick=()=>setZoom(S.zoom+0.2);
+$("zoomOut").onclick=()=>setZoom(S.zoom-0.2);
+$("zoomFit").onclick=()=>setZoom(1);
+
+/* ===== Header, grid ===== */
+function renderTracSeg(){
+  const seg=$("tracSeg"); seg.replaceChildren();
+  for(const k of Object.keys(TR)){
+    const b=document.createElement("button");
+    b.innerHTML=`<span class="he">${TR[k].he}</span>`; b.title=TR[k].en;
+    b.classList.toggle("on", k===S.t);
+    b.onclick=()=>switchTractate(k);
+    seg.appendChild(b);
+  }
+}
+function renderHeader(){
+  const t=T(), d=curDaf();
+  $("dafLabel").innerHTML=`<span class="he">דף ${heb(d)}</span><small>${t.en} ${d}</small>`;
+  $("learnBtn").classList.toggle("on", !!S.done[t.key+d]);
+  $("prev").disabled = d<=t.first; $("next").disabled = d>=t.last;
+  document.title = `${t.en} ${d} · Daf Study Player`;
+}
+function renderGrid(){
+  const t=T(), g=$("grid"); g.replaceChildren();
+  let doneN=0;
+  for(let d=t.first; d<=t.last; d++){
+    const list=t.byDaf[d], has13=list.some(s=>s.series==="c13");
+    const c=document.createElement("button");
+    const done=!!S.done[t.key+d]; if(done) doneN++;
+    c.className="cell"+(d===curDaf()?" cur":"")+(done?" done":"");
+    c.title=`${t.en} ${d}: ${list.length} shiur${list.length===1?"":"im"}${has13?", Cycle 13 available":""}`;
+    c.innerHTML=`${has13?'<span class="c13"></span>':""}<span class="he">${heb(d)}</span><span class="n">${d}</span>`;
+    c.onclick=()=>{ goDaf(d); if(innerWidth<=900) toggleSide(false); };
+    g.appendChild(c);
+  }
+  const tot=t.last-t.first+1;
+  $("progTxt").textContent=`${t.en}: ${doneN} of ${tot} dapim learned`;
+  $("progBar").style.width=(doneN/tot*100)+"%";
+  const cur=g.querySelector(".cur"); if(cur && !$("side").hidden) cur.scrollIntoView({block:"nearest"});
+}
+
+/* ===== Shiurim and audio ===== */
+const fmt = t => { if(!isFinite(t)) return "0:00"; t=Math.floor(t); const h=Math.floor(t/3600), m=Math.floor(t%3600/60), s=t%60; return (h?h+":"+String(m).padStart(2,"0"):m)+":"+String(s).padStart(2,"0"); };
+const label = s => SERIES[s.series] + (s.part===2?" · part 2":"");
+function renderShiurim(){
+  const box=$("shiurim"); box.replaceChildren();
+  const list=T().byDaf[curDaf()];
+  const lbl=document.createElement("span"); lbl.className="lbl"; lbl.textContent="Shiurim on this daf:"; box.appendChild(lbl);
+  if(!list.length){ const e=document.createElement("span"); e.className="hint"; e.textContent="Rabbi Brown has no shiur on this daf in the archive."; box.appendChild(e); return; }
+  list.forEach((s,i)=>{
+    const b=document.createElement("button");
+    b.className="chip"+(current===s?" on":"");
+    b.title=[s.date&&("Recorded "+s.date), s.note].filter(Boolean).join(" · ");
+    b.innerHTML=`${i===0&&s.series==="c13"?'<span class="pref">Preferred</span>':""}${label(s)}<span class="t">${s.len}</span>${s.note?`<span class="note">${s.note}</span>`:""}${S.heard[s.url]?'<span style="color:var(--done)">✓</span>':""}`;
+    b.onclick=()=>select(s,true);
+    box.appendChild(b);
+  });
+}
+function applyMode(){
+  $("inline").hidden = audioOK===false;
+  $("outside").hidden = audioOK!==false;
+}
+function select(s, userAction){
+  if(current!==s){
+    savePos();
+    current=s;
+    $("ext1").href=s.url; $("openBtn").href=s.url;
+    $("openTxt").textContent=`Play ${label(s)} · ${s.len}`;
+    if(audioOK!==false){
+      audio.src=s.url;
+      const resume=S.pos[s.url]||0;
+      audio.onloadedmetadata=()=>{ audioOK=true; applyMode(); if(resume && resume<audio.duration-5) audio.currentTime=resume; audio.playbackRate=S.rate; updateTime(); };
+    }
+    if("mediaSession" in navigator) try{ navigator.mediaSession.metadata=new MediaMetadata({title:`${T().en} ${curDaf()}`, artist:"Rabbi Moshe Brown", album:label(s)}); }catch(e){}
+  }
+  if(userAction && audioOK!==false) audio.play().catch(()=>{});
+  renderShiurim(); updateTime();
+}
+function pickDefault(){
+  const list=T().byDaf[curDaf()];
+  if(!list.length){ audio.pause(); savePos(); current=null; audio.removeAttribute("src"); renderShiurim(); updateTime(); return; }
+  select(list.find(s=>s.series==="c13") || list[0], false);
+}
+function savePos(){ if(current && audio.currentTime>0){ S.pos[current.url]=Math.floor(audio.currentTime); store.set("pos",S.pos); } }
+function updateTime(){
+  $("cur").textContent=fmt(audio.currentTime||0);
+  $("dur").textContent=current?(isFinite(audio.duration)?fmt(audio.duration):current.len):"0:00";
+  $("seek").value=audio.duration?(audio.currentTime/audio.duration*1000):0;
+}
+function blockAudio(){ if(audioOK===true) return; audioOK=false; applyMode(); }
+audio.addEventListener("error", blockAudio);
+document.addEventListener("securitypolicyviolation", e=>{ if(/cloudfront/.test(e.blockedURI||"")) blockAudio(); });
+let lastSave=0;
+audio.addEventListener("timeupdate",()=>{
+  updateTime();
+  if(Date.now()-lastSave>5000){ lastSave=Date.now(); savePos(); }
+  if(current && audio.duration && audio.currentTime/audio.duration>.9 && !S.heard[current.url]){ S.heard[current.url]=true; store.set("heard",S.heard); renderShiurim(); }
+});
+audio.addEventListener("play",()=>$("playIcon").innerHTML='<path d="M6 4h4v16H6zM14 4h4v16h-4z"/>');
+audio.addEventListener("pause",()=>{ $("playIcon").innerHTML='<path d="M7 4l14 8-14 8z"/>'; savePos(); });
+$("openBtn").addEventListener("click",()=>{ if(current){ S.heard[current.url]=true; store.set("heard",S.heard); setTimeout(renderShiurim,50);} });
+$("play").onclick=()=>{ if(!current) return; audio.paused?audio.play().catch(()=>{}):audio.pause(); };
+$("back").onclick=()=>{ audio.currentTime=Math.max(0,audio.currentTime-15); };
+$("fwd").onclick=()=>{ audio.currentTime=Math.min(audio.duration||1e9,audio.currentTime+30); };
+$("seek").oninput=e=>{ if(audio.duration) audio.currentTime=e.target.value/1000*audio.duration; };
+$("rate").value=String(S.rate);
+$("rate").onchange=e=>{ S.rate=+e.target.value; audio.playbackRate=S.rate; store.set("rate",S.rate); };
+addEventListener("pagehide",savePos);
+
+/* ===== Navigation ===== */
+function goDaf(d){
+  const t=T(); d=Math.max(t.first,Math.min(t.last,d));
+  const changed = d!==curDaf();
+  S.daf[S.t]=d; store.set("daf",S.daf);
+  if(changed && S.amud==="b"){ S.amud="a"; store.set("amud","a"); }
+  try{ history.replaceState(null,"","#"+t.key+d); }catch(e){}
+  renderHeader(); renderPages(); renderGrid();
+  if(changed || !current) pickDefault(); else renderShiurim();
+}
+function switchTractate(k){
+  if(k===S.t) return;
+  savePos(); audio.pause();
+  S.t=k; store.set("t",k); current=null;
+  renderTracSeg(); goDaf(curDaf()); pickDefault();
+}
+function setAmud(a){ S.amud=a; store.set("amud",a); renderPages(); }
+function toggleSide(force){ S.side = force===undefined ? !S.side : force; store.set("side",S.side); $("side").hidden=!S.side; if(S.side) renderGrid(); setTimeout(renderPages,0); }
+$("prev").onclick=()=>goDaf(curDaf()-1);
+$("next").onclick=()=>goDaf(curDaf()+1);
+$("toggleSide").onclick=()=>toggleSide();
+document.querySelectorAll("#amudSeg button").forEach(b=>b.onclick=()=>setAmud(b.dataset.v));
+$("learnBtn").onclick=()=>{ const k=T().key+curDaf(); S.done[k]=!S.done[k]; store.set("done",S.done); renderHeader(); renderGrid(); };
+document.addEventListener("keydown",e=>{
+  if(/INPUT|SELECT|TEXTAREA/.test(e.target.tagName)||e.metaKey||e.ctrlKey||e.altKey) return;
+  const k=e.key;
+  if(k===" "){ e.preventDefault(); if(audioOK!==false) $("play").click(); }
+  else if(k==="ArrowLeft"){ e.preventDefault(); $("back").click(); }
+  else if(k==="ArrowRight"){ e.preventDefault(); $("fwd").click(); }
+  else if(k==="["){ goDaf(curDaf()-1); }
+  else if(k==="]"){ goDaf(curDaf()+1); }
+  else if(k==="a"||k==="A"){ setAmud("a"); }
+  else if(k==="b"||k==="B"){ setAmud("b"); }
+});
+
+/* ===== Start ===== */
+(function init(){
+  const m=(location.hash||"").match(/^#([yb])(\d+)$/);
+  if(m && TR[m[1]]){ S.t=m[1]; S.daf[m[1]]=+m[2]; }
+  if(!TR[S.t]) S.t="y";
+  $("side").hidden=!S.side;
+  renderTracSeg(); applyMode(); goDaf(curDaf());
+})();
+</script>
+
+</body>
+</html>
